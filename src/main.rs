@@ -12,7 +12,6 @@ use structopt::StructOpt;
 
 fn main() -> Result<()> {
     let args = Opt::from_args();
-
     for e in Walk::new(args.dir) {
         let e = e?;
         if let Some(t) = e.file_type() {
@@ -24,9 +23,11 @@ fn main() -> Result<()> {
                 if let Some(dir) = path.parent() {
                     let input = String::from_utf8(read(&path)?)?;
                     if let Some(s) = apply(&dir, &input) {
-                        println!("update : {}", path.display());
-                        if !args.dry_run {
-                            write(path, s)?;
+                        if s != input {
+                            println!("update : {}", path.display());
+                            if !args.dry_run {
+                                write(path, s)?;
+                            }
                         }
                     }
                 }
@@ -66,7 +67,6 @@ fn read_source(dir: &Path, path: &str) -> String {
 }
 fn try_read_source(dir: &Path, path: &str) -> Result<String> {
     let path = dir.join(path);
-    println!("reading {}", path.display());
     Ok(String::from_utf8(read(&path)?)?)
 }
 
