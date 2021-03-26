@@ -29,7 +29,7 @@ fn main() -> Result<()> {
                                 eprintln!("update : {}", rel_path.display());
                                 for log in logs {
                                     if log.is_modified {
-                                        eprintln!("  <-- {}", log.source);
+                                        eprintln!("  <-- {}", log.source_rel_path.display());
                                     }
                                 }
                                 if !args.dry_run {
@@ -73,8 +73,12 @@ fn apply(root: &Path, base: &Path, input: &str) -> ApplyResult {
         let mut text = String::new();
         text += c.get(1).unwrap().as_str();
         text += "\n/**\n";
+        let source_rel_path;
         match include(root, base, &source) {
-            Ok(s) => text += &s,
+            Ok(s) => {
+                text += &s.text;
+                source_rel_path = s.rel_path;
+            }
             Err(e) => {
                 errors.push(ErrorEntry::ReadSource {
                     source,
@@ -90,7 +94,8 @@ fn apply(root: &Path, base: &Path, input: &str) -> ApplyResult {
         logs.push(LogEntry {
             _offset: offset,
             is_modified,
-            source,
+            _source: source,
+            source_rel_path,
         });
         text
     });
@@ -106,10 +111,18 @@ fn apply(root: &Path, base: &Path, input: &str) -> ApplyResult {
     }
 }
 
-fn include(root: &Path, base: &Path, source: &str) -> Result<String> {
+struct IncludeResult {
+    rel_path: PathBuf,
+    text: String,
+}
+
+fn include(root: &Path, base: &Path, source: &str) -> Result<IncludeResult> {
     let source = base.join(source);
-    if source.canonicalize()?.starts_with(&root.canonicalize()?) {
-        Ok(String::from_utf8(read(&source)?)?)
+    if let Ok(rel_path) = source.canonicalize()?.strip_prefix(&root.canonicalize()?) {
+        Ok(IncludeResult {
+            rel_path: rel_path.to_path_buf(),
+            text: String::from_utf8(read(&source)?)?,
+        })
     } else {
         bail!("source is out of root");
     }
@@ -135,7 +148,8 @@ enum ApplyResult {
 }
 struct LogEntry {
     _offset: usize,
-    source: String,
+    _source: String,
+    source_rel_path: PathBuf,
     is_modified: bool,
 }
 
