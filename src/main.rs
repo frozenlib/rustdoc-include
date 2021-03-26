@@ -1,4 +1,5 @@
 use anyhow::{bail, Result};
+use colored::*;
 use ignore::Walk;
 use parse_display::Display;
 use regex::{Captures, Regex};
@@ -26,7 +27,7 @@ fn main() -> Result<()> {
                     match apply(&args.root, base, &input) {
                         ApplyResult::Ok { text, logs } => {
                             if let Some(text) = text {
-                                eprintln!("update : {}", rel_path.display());
+                                eprintln!("{} : {}", "Update".green().bold(), rel_path.display());
                                 for log in logs {
                                     if log.is_modified {
                                         eprintln!("  <-- {}", log.source_rel_path.display());
@@ -178,10 +179,11 @@ impl ErrorEntry {
                 let start_pos = TextPos::from_str_offset(input, *start_offset);
                 let end_pos = TextPos::from_str_offset(input, *end_offset);
                 format!(
-                    r"error : mismatch source.
+                    r"{} : mismatch source.
   start : `{}` ({}:{})
     end : `{}` ({}:{})
 ",
+                    "Error".red().bold(),
                     start_source,
                     rel_path.display(),
                     start_pos,
@@ -197,8 +199,9 @@ impl ErrorEntry {
             } => {
                 let pos = TextPos::from_str_offset(input, *offset);
                 format!(
-                    r"error : read source failed. `{}` ({})
+                    r"{} : read source failed. `{}` ({})
 --> {}:{}",
+                    "Errro".red().bold(),
                     source,
                     reason,
                     rel_path.display(),
