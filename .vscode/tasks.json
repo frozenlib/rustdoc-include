@@ -41,6 +41,23 @@
     },
     {
       "type": "shell",
+      "label": "cargo install",
+      "command": "cargo",
+      "args": [
+        "install",
+        "--path",
+        "."
+      ],
+      "problemMatcher": [
+        "$rustc"
+      ],
+      "presentation": {
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "type": "shell",
       "label": "cargo test",
       "command": "cargo",
       "args": [
@@ -51,6 +68,27 @@
       ],
       "group": {
         "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "type": "shell",
+      "label": "cargo run",
+      "command": "cargo",
+      "args": [
+        "run",
+        "--",
+        "${workspaceFolder}"
+      ],
+      "problemMatcher": [
+        "$rustc"
+      ],
+      "group": {
+        "kind": "test",
         "isDefault": true
       },
       "presentation": {
