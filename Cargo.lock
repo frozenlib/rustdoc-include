@@ -328,6 +328,7 @@ dependencies = [
  "anyhow",
  "colored",
  "ignore",
+ "once_cell",
  "parse-display",
  "regex",
  "structopt",

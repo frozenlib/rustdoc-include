@@ -1,6 +1,7 @@
 use anyhow::{bail, Result};
 use colored::*;
 use ignore::Walk;
+use once_cell::sync::Lazy;
 use parse_display::Display;
 use regex::{Captures, Regex};
 use std::{
@@ -52,10 +53,12 @@ fn main() -> Result<()> {
     Ok(())
 }
 fn apply(root: &Path, base: &Path, input: &str) -> ApplyResult {
-    let re = Regex::new(r#"(?ms)(^\s*//\s*#\[include_doc\s*=\s*"([^"]*)"]\s*$).*?(^\s*//\s*#\[include_doc_end\s*=\s*"([^"]*)"\s*\]\s*$)"#).unwrap();
+    static RE: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(r#"(?ms)(^\s*//\s*#\[include_doc\s*=\s*"([^"]*)"]\s*$).*?(^\s*//\s*#\[include_doc_end\s*=\s*"([^"]*)"\s*\]\s*$)"#).unwrap()
+    });
     let mut logs = Vec::new();
     let mut errors = Vec::new();
-    let output = re.replace_all(input, |c: &Captures| {
+    let output = RE.replace_all(input, |c: &Captures| {
         let start_source = c.get(2).unwrap();
         let end_source = c.get(4).unwrap();
         if start_source.as_str() != end_source.as_str() {
