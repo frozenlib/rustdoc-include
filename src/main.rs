@@ -42,6 +42,7 @@ fn main() -> Result<()> {
                             for e in errors {
                                 eprintln!("{}", e.to_error_message(&rel_path, &input));
                             }
+                            bail!("aborting due to previous error");
                         }
                     }
                 }
@@ -179,9 +180,9 @@ impl ErrorEntry {
                 let start_pos = TextPos::from_str_offset(input, *start_offset);
                 let end_pos = TextPos::from_str_offset(input, *end_offset);
                 format!(
-                    r"{} : mismatch source.
-  start : `{}` ({}:{})
-    end : `{}` ({}:{})
+                    r"{}: mismatch source.
+  start: `{}` ({}:{})
+    end: `{}` ({}:{})
 ",
                     "Error".red().bold(),
                     start_source,
