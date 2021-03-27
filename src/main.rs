@@ -78,7 +78,7 @@ fn apply(root: &Path, base: &Path, input: &str) -> ApplyResult {
         let source_rel_path;
         match include(root, base, &source) {
             Ok(s) => {
-                text += &s.text;
+                text += &s.text.trim();
                 source_rel_path = s.rel_path;
             }
             Err(e) => {
