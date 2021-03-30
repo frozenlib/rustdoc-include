@@ -12,6 +12,8 @@ use std::{
 };
 use structopt::StructOpt;
 
+mod attr;
+
 fn main() -> Result<()> {
     let args = Opt::from_args();
     for e in Walk::new(&args.root) {
@@ -52,6 +54,7 @@ fn main() -> Result<()> {
     }
     Ok(())
 }
+
 fn apply(root: &Path, base: &Path, input: &str) -> ApplyResult {
     static RE: Lazy<Regex> = Lazy::new(|| {
         Regex::new(r#"(?ms)(^\s*//\s*#\[include_doc\s*=\s*"([^"]*)"]\s*$).*?(^\s*//\s*#\[include_doc_end\s*=\s*"([^"]*)"\s*\]\s*$)"#).unwrap()
