@@ -85,7 +85,27 @@
         "${workspaceFolder}/examples"
       ],
       "problemMatcher": [
-        "$rustc"
+        "$rustc",
+        {
+          "owner": "include-doc",
+          "fileLocation": [
+            "relative",
+            "${workspaceFolder}/examples"
+          ],
+          "pattern": [
+            {
+              "regexp": "^(error): (.*)$",
+              "severity": 1,
+              "message": 2,
+            },
+            {
+              "regexp": "^--> (.*):(\\d+)\\s*$",
+              "file": 1,
+              "line": 2,
+              "loop": true,
+            },
+          ]
+        },
       ],
       "group": {
         "kind": "test",

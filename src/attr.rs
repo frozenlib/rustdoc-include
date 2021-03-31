@@ -1,4 +1,5 @@
 use crate::text_pos::TextPos;
+use colored::Colorize;
 use once_cell::sync::Lazy;
 use regex::{Captures, Match, Regex};
 use std::{fmt::Display, ops::Range};
@@ -115,15 +116,20 @@ impl<'a> Attr<'a> {
             Self::from_captures(&c).ok_or_else(|| BadAttrError::from_match(c.get(0).unwrap()))
         })
     }
+
     pub fn message(&self, rel_path: impl Display, input: &str) -> String {
-        let p = TextPos::from_str_offset(input, self.range.start);
         format!(
-            r"--> {}:{}
-  {}",
+            "--> {}:{}\n {} {}",
             rel_path,
-            p.line,
+            self.line_str(input),
+            "|".cyan().bold(),
             &input[self.range()]
         )
+    }
+    pub fn line_str(&self, input: &str) -> String {
+        TextPos::from_str_offset(input, self.range.start)
+            .line
+            .to_string()
     }
 }
 
@@ -141,9 +147,10 @@ impl BadAttrError {
         format!(
             r"invalid attribute
 --> {}:{}
-  {}",
+ {} {}",
             rel_path,
             p.line,
+            "|".cyan().bold(),
             &input[self.range()]
         )
     }

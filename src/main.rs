@@ -2,6 +2,7 @@ use anyhow::{bail, Result};
 use colored::*;
 use ignore::Walk;
 use std::{
+    cmp::max,
     ffi::OsStr,
     fs::read,
     fs::write,
@@ -14,7 +15,13 @@ mod text_pos;
 
 use attr::{Attr, BadAttrError};
 
-fn main() -> Result<()> {
+fn main() {
+    if let Err(e) = run() {
+        eprintln!("{}: {}", "error".red().bold(), e);
+        std::process::exit(1);
+    }
+}
+fn run() -> Result<()> {
     let args = Opt::from_args();
     for e in Walk::new(&args.root) {
         let e = e?;
@@ -30,7 +37,7 @@ fn main() -> Result<()> {
                     match apply(&args.root, base, &input) {
                         Ok(result) => {
                             if let Some(text) = result.text {
-                                eprintln!("{} : {}", "Update".green().bold(), rel_path.display());
+                                eprintln!("{}: {}", "update".green().bold(), rel_path.display());
                                 for log in result.logs {
                                     if log.is_modified {
                                         eprintln!("  <-- {}", log.source_rel_path.display());
@@ -42,11 +49,7 @@ fn main() -> Result<()> {
                             }
                         }
                         Err(e) => {
-                            bail!(
-                                "{}: {}",
-                                "Error".red().bold(),
-                                e.to_error_message(&rel_path, &input)
-                            );
+                            bail!("{}", e.to_error_message(&rel_path, &input));
                         }
                     }
                 }
@@ -272,11 +275,24 @@ impl<'a> ApplyError<'a> {
                 end,
                 mismatch,
             } => {
+                let start_line = start.line_str(input);
+                let end_line = end.line_str(input);
+                let line_width = max(start_line.len(), end_line.len());
+
                 format!(
-                    "{}\n{}\n{}",
+                    r"{}
+--> {rel_path}:{start_line}
+--> {rel_path}:{end_line}
+{start_line:>line_width$} {sep} {start_text}
+{end_line:>line_width$} {sep} {end_text}",
                     mismatch.message(),
-                    start.message(&rel_path, input),
-                    end.message(&rel_path, input)
+                    rel_path = rel_path,
+                    start_line = start_line,
+                    start_text = &input[start.range()],
+                    end_line = end_line,
+                    end_text = &input[end.range()],
+                    sep = "|".cyan().bold(),
+                    line_width = line_width,
                 )
             }
             ApplyError::TextNofFound(attr) => {
@@ -286,14 +302,12 @@ impl<'a> ApplyError<'a> {
                 };
                 format!("{}\n{}", msg, attr.message(rel_path, input))
             }
-            ApplyError::ReadSource { attr, reason } => {
-                format!(
-                    "read `{}` failed. ({})\n{}",
-                    attr.path,
-                    reason,
-                    attr.message(rel_path, input)
-                )
-            }
+            ApplyError::ReadSource { attr, reason } => format!(
+                "cannot read `{}` ({})\n{}",
+                attr.path,
+                reason,
+                attr.message(rel_path, input)
+            ),
         }
     }
 }
