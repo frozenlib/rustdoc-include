@@ -1,9 +1,6 @@
 use anyhow::{bail, Result};
 use colored::*;
 use ignore::Walk;
-use once_cell::sync::Lazy;
-use parse_display::Display;
-use regex::{Captures, Regex};
 use std::{
     ffi::OsStr,
     fs::read,
@@ -13,6 +10,9 @@ use std::{
 use structopt::StructOpt;
 
 mod attr;
+mod text_pos;
+
+use attr::{Attr, BadAttrError};
 
 fn main() -> Result<()> {
     let args = Opt::from_args();
@@ -28,10 +28,10 @@ fn main() -> Result<()> {
                 if let Some(base) = path.parent() {
                     let input = String::from_utf8(read(&path)?)?;
                     match apply(&args.root, base, &input) {
-                        ApplyResult::Ok { text, logs } => {
-                            if let Some(text) = text {
+                        Ok(result) => {
+                            if let Some(text) = result.text {
                                 eprintln!("{} : {}", "Update".green().bold(), rel_path.display());
-                                for log in logs {
+                                for log in result.logs {
                                     if log.is_modified {
                                         eprintln!("  <-- {}", log.source_rel_path.display());
                                     }
@@ -41,11 +41,12 @@ fn main() -> Result<()> {
                                 }
                             }
                         }
-                        ApplyResult::Error { errors } => {
-                            for e in errors {
-                                eprintln!("{}", e.to_error_message(&rel_path, &input));
-                            }
-                            bail!("aborting due to previous error");
+                        Err(e) => {
+                            bail!(
+                                "{}: {}",
+                                "Error".red().bold(),
+                                e.to_error_message(&rel_path, &input)
+                            );
                         }
                     }
                 }
@@ -55,68 +56,154 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn apply(root: &Path, base: &Path, input: &str) -> ApplyResult {
-    static RE: Lazy<Regex> = Lazy::new(|| {
-        Regex::new(r#"(?ms)(^\s*//\s*#\[include_doc\s*=\s*"([^"]*)"]\s*$).*?(^\s*//\s*#\[include_doc_end\s*=\s*"([^"]*)"\s*\]\s*$)"#).unwrap()
-    });
-    let mut logs = Vec::new();
-    let mut errors = Vec::new();
-    let output = RE.replace_all(input, |c: &Captures| {
-        let start_source = c.get(2).unwrap();
-        let end_source = c.get(4).unwrap();
-        if start_source.as_str() != end_source.as_str() {
-            errors.push(ErrorEntry::MismatchSource {
-                start_offset: start_source.start(),
-                start_source: start_source.as_str().into(),
-                end_offset: end_source.start(),
-                end_source: end_source.as_str().into(),
-            });
-        }
-        if !errors.is_empty() {
-            return String::new();
-        }
-
-        let source = start_source.as_str().to_string();
-        let offset = start_source.start();
-        let mut text = String::new();
-        text += c.get(1).unwrap().as_str();
-        text += "\n/**\n";
-        let source_rel_path;
-        match include(root, base, &source) {
-            Ok(s) => {
-                text += &s.text.trim();
-                source_rel_path = s.rel_path;
-            }
-            Err(e) => {
-                errors.push(ErrorEntry::ReadSource {
-                    source,
-                    offset,
-                    reason: e.to_string(),
-                });
-                return String::new();
+fn make_pair<'a>(
+    start: &mut Option<Attr<'a>>,
+    attr: Result<Attr<'a>, BadAttrError>,
+) -> Result<Option<(Attr<'a>, Attr<'a>)>, ApplyError<'a>> {
+    match attr {
+        Ok(attr) => {
+            if attr.action == attr::Action::Start {
+                if let Some(start) = start.replace(attr) {
+                    Err(ApplyError::MissingAttr(start))
+                } else {
+                    Ok(None)
+                }
+            } else {
+                let end = attr;
+                if let Some(start) = start.take() {
+                    if let Some(mismatch) = start.mismatch(&end) {
+                        Err(ApplyError::MismatchAttr {
+                            start,
+                            end,
+                            mismatch,
+                        })
+                    } else {
+                        Ok(Some((start, end)))
+                    }
+                } else {
+                    Err(ApplyError::MissingAttr(end))
+                }
             }
         }
-        text += "\n*/\n";
-        text += c.get(3).unwrap().as_str();
-        let is_modified = text != c.get(0).unwrap().as_str();
-        logs.push(LogEntry {
-            _offset: offset,
-            is_modified,
-            _source: source,
-            source_rel_path,
-        });
-        text
-    });
-    if !errors.is_empty() {
-        ApplyResult::Error { errors }
-    } else {
-        let text = if output == input {
-            None
-        } else {
-            Some(output.into())
-        };
-        ApplyResult::Ok { logs, text }
+        Err(e) => Err(ApplyError::BadAttr(e)),
     }
+}
+fn trim<'a, 'b>(
+    text: &'a str,
+    start: &Attr<'b>,
+    end: &Attr<'b>,
+) -> Result<&'a str, ApplyError<'b>> {
+    let index_start = match start.arg {
+        attr::ActionArg::None => 0,
+        attr::ActionArg::Line(line) => line_offset(text, line),
+        attr::ActionArg::LineRev(line) => line_offset_rev(text, line),
+        attr::ActionArg::Text(p) => {
+            if let Some(index) = text.find(p) {
+                index
+            } else {
+                return Err(ApplyError::TextNofFound(start.clone()));
+            }
+        }
+    };
+    let index_end = match end.arg {
+        attr::ActionArg::None => text.len(),
+        attr::ActionArg::Line(line) => line_offset(text, line),
+        attr::ActionArg::LineRev(line) => line_offset_rev(text, line),
+        attr::ActionArg::Text(p) => {
+            if let Some(index) = text.rfind(p) {
+                index
+            } else {
+                return Err(ApplyError::TextNofFound(end.clone()));
+            }
+        }
+    };
+    let index_start = index_end - text[index_start..index_end].trim_start().len();
+    let index_end = index_start + text[index_start..index_end].trim_end().len();
+    Ok(&text[index_start..index_end])
+}
+fn line_offset(text: &str, mut line: usize) -> usize {
+    if line <= 1 {
+        return 0;
+    }
+    line -= 1;
+    for (index, c) in text.char_indices() {
+        if c == '\n' {
+            line -= 1;
+            if line == 0 {
+                return index + 1;
+            }
+        }
+    }
+    text.len()
+}
+fn line_offset_rev(text: &str, mut line: usize) -> usize {
+    if line == 0 {
+        return text.len();
+    }
+    for (index, c) in text.char_indices().rev() {
+        if c == '\n' {
+            line -= 1;
+            if line == 0 {
+                return index;
+            }
+        }
+    }
+    0
+}
+fn get_old_text<'a>(text: &'a str, start: &Attr, end: &Attr) -> Option<&'a str> {
+    let text = &text[start.range.end..end.range.start];
+    let kind = start.kind;
+    if !text.starts_with(kind.doc_comment_start()) {
+        return None;
+    }
+    let text = &text[kind.doc_comment_start().len()..];
+    if !text.ends_with(kind.doc_comment_end()) {
+        return None;
+    }
+    Some(&text[..text.len() - kind.doc_comment_end().len()])
+}
+fn apply<'a>(root: &Path, base: &Path, input: &'a str) -> Result<ApplyResult, ApplyError<'a>> {
+    let mut logs = Vec::new();
+    let mut attr_start = None;
+    let mut text = String::new();
+    let mut text_is_modified = false;
+    let mut last_offset = 0;
+    for attr in Attr::find_iter(input) {
+        if let Some((start, end)) = make_pair(&mut attr_start, attr)? {
+            let kind = start.kind;
+            text.push_str(&input[last_offset..start.range.end]);
+            text.push_str(kind.doc_comment_start());
+            let source = start.path;
+            match include(root, base, source) {
+                Ok(s) => {
+                    let text_new = trim(&s.text, &start, &end)?;
+                    let is_modified = if let Some(text_old) = get_old_text(input, &start, &end) {
+                        text_old != text_new
+                    } else {
+                        true
+                    };
+                    text_is_modified |= is_modified;
+                    let source_rel_path = s.rel_path;
+                    text.push_str(text_new);
+                    logs.push(LogEntry {
+                        source_rel_path,
+                        is_modified,
+                    });
+                }
+                Err(e) => {
+                    return Err(ApplyError::ReadSource {
+                        attr: start,
+                        reason: e.to_string(),
+                    });
+                }
+            }
+            text.push_str(kind.doc_comment_end());
+            last_offset = end.range.start;
+        }
+    }
+    text.push_str(&input[last_offset..]);
+    let text = if text_is_modified { Some(text) } else { None };
+    Ok(ApplyResult { text, logs })
 }
 
 struct IncludeResult {
@@ -145,117 +232,138 @@ struct Opt {
     dry_run: bool,
 }
 
-enum ApplyResult {
-    Ok {
-        text: Option<String>,
-        logs: Vec<LogEntry>,
-    },
-    Error {
-        errors: Vec<ErrorEntry>,
-    },
+struct ApplyResult {
+    text: Option<String>,
+    logs: Vec<LogEntry>,
 }
 struct LogEntry {
-    _offset: usize,
-    _source: String,
     source_rel_path: PathBuf,
     is_modified: bool,
 }
 
-enum ErrorEntry {
-    MismatchSource {
-        start_offset: usize,
-        start_source: String,
-        end_offset: usize,
-        end_source: String,
+enum ApplyError<'a> {
+    BadAttr(BadAttrError),
+    MissingAttr(Attr<'a>),
+    MismatchAttr {
+        start: Attr<'a>,
+        end: Attr<'a>,
+        mismatch: attr::Mismatch,
     },
+    TextNofFound(Attr<'a>),
     ReadSource {
-        offset: usize,
-        source: String,
+        attr: Attr<'a>,
         reason: String,
     },
 }
-impl ErrorEntry {
-    fn to_error_message(&self, rel_path: &Path, input: &String) -> String {
+impl<'a> ApplyError<'a> {
+    fn to_error_message(&self, rel_path: &Path, input: &str) -> String {
+        let rel_path = rel_path.display();
         match self {
-            ErrorEntry::MismatchSource {
-                start_offset,
-                start_source,
-                end_offset,
-                end_source,
+            ApplyError::BadAttr(e) => e.message(rel_path, input),
+            ApplyError::MissingAttr(attr) => {
+                let msg = match attr.action {
+                    attr::Action::Start => "missing end attribute",
+                    attr::Action::End => "missing start attribute",
+                };
+                format!("{}\n{}", msg, attr.message(&rel_path, input))
+            }
+            ApplyError::MismatchAttr {
+                start,
+                end,
+                mismatch,
             } => {
-                let start_pos = TextPos::from_str_offset(input, *start_offset);
-                let end_pos = TextPos::from_str_offset(input, *end_offset);
                 format!(
-                    r"{}: mismatch source.
-  start: `{}` ({}:{})
-    end: `{}` ({}:{})
-",
-                    "Error".red().bold(),
-                    start_source,
-                    rel_path.display(),
-                    start_pos,
-                    end_source,
-                    rel_path.display(),
-                    end_pos,
+                    "{}\n{}\n{}",
+                    mismatch.message(),
+                    start.message(&rel_path, input),
+                    end.message(&rel_path, input)
                 )
             }
-            ErrorEntry::ReadSource {
-                offset,
-                source,
-                reason,
-            } => {
-                let pos = TextPos::from_str_offset(input, *offset);
+            ApplyError::TextNofFound(attr) => {
+                let msg = match attr.action {
+                    attr::Action::Start => "start text not found",
+                    attr::Action::End => "end text not found",
+                };
+                format!("{}\n{}", msg, attr.message(rel_path, input))
+            }
+            ApplyError::ReadSource { attr, reason } => {
                 format!(
-                    r"{} : read source failed. `{}` ({})
---> {}:{}",
-                    "Errro".red().bold(),
-                    source,
+                    "read `{}` failed. ({})\n{}",
+                    attr.path,
                     reason,
-                    rel_path.display(),
-                    pos
+                    attr.message(rel_path, input)
                 )
             }
         }
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Display)]
-#[display("{line}:{column}")]
-struct TextPos {
-    line: usize,
-    column: usize,
-}
-impl TextPos {
-    fn from_str_offset(s: &str, offset: usize) -> Self {
-        let mut value = Self { line: 1, column: 1 };
-        for (index, c) in s.char_indices() {
-            if index >= offset {
-                break;
-            }
-            if c == '\n' {
-                value.line += 1;
-                value.column = 1;
-            } else {
-                value.column += 1;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use anyhow::Result;
+    use std::{
+        fs::{read, read_dir, DirEntry},
+        path::Path,
+    };
+    #[test]
+    fn test_convert_file() -> Result<()> {
+        let dir = Path::new("./tests/data");
+        for e in read_dir(&dir)? {
+            let e = e?;
+            if let Some((input, expected)) = to_input_expected(e) {
+                eprint!("test {} ... ", input);
+                match check_convert_file(dir, &dir.join(input), &dir.join(expected)) {
+                    Ok(_) => {
+                        eprintln!("{}", "ok".green());
+                    }
+                    Err(e) => {
+                        eprintln!("{}", "FAILED".red());
+                        bail!("{}", e)
+                    }
+                }
             }
         }
-        value
+        Ok(())
     }
-}
-
-#[test]
-fn text_pos_from_str_offset() {
-    let s = "abc\ndef";
-    check(s, 0, 1, 1);
-    check(s, 1, 1, 2);
-    check(s, 2, 1, 3);
-    check(s, 3, 1, 4);
-    check(s, 4, 2, 1);
-    check(s, 5, 2, 2);
-    fn check(s: &str, offset: usize, line: usize, column: usize) {
-        assert_eq!(
-            TextPos::from_str_offset(s, offset),
-            TextPos { line, column }
-        );
+    fn to_input_expected(e: DirEntry) -> Option<(String, String)> {
+        if !e.file_type().ok()?.is_file() {
+            return None;
+        }
+        let path = e.path();
+        let name = path.file_name()?.to_str()?;
+        if !name.ends_with(".rs") || name.ends_with(".expected.rs") {
+            return None;
+        }
+        let mut name_expected = path.file_stem()?.to_str()?.to_string();
+        name_expected += ".expected.rs";
+        Some((name.to_string(), name_expected))
+    }
+    fn check_convert_file(dir: &Path, input_path: &Path, expected_path: &Path) -> Result<()> {
+        let input_str = String::from_utf8(read(input_path)?)?;
+        let expected_str = String::from_utf8(read(expected_path)?)?;
+        let input_rel_path = input_path.strip_prefix(&dir).unwrap_or(&input_path);
+        match apply(&dir, &dir, &input_str) {
+            Ok(x) => {
+                let output_str = if let Some(text) = &x.text {
+                    text
+                } else {
+                    &input_str
+                };
+                let output_str = output_str.trim();
+                let expected_str = expected_str.trim();
+                if output_str != expected_str {
+                    bail!(
+                        "mismatch result\nexpected:\n{}\n\nactual:\n{}",
+                        expected_str,
+                        output_str
+                    );
+                }
+                Ok(())
+            }
+            Err(e) => {
+                bail!("{}", e.to_error_message(input_rel_path, &input_str))
+            }
+        }
     }
 }

@@ -82,7 +82,7 @@
       "args": [
         "run",
         "--",
-        "${workspaceFolder}"
+        "${workspaceFolder}/examples"
       ],
       "problemMatcher": [
         "$rustc"

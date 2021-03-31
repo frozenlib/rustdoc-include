@@ -1,16 +1,16 @@
-use std::ops::Range;
-
+use crate::text_pos::TextPos;
 use once_cell::sync::Lazy;
 use regex::{Captures, Match, Regex};
+use std::{fmt::Display, ops::Range};
 use thiserror::Error;
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct Attr<'a> {
-    range: Range<usize>,
-    path: &'a str,
-    kind: Kind,
-    action: Action,
-    arg: ActionArg<'a>,
+    pub range: Range<usize>,
+    pub path: &'a str,
+    pub kind: Kind,
+    pub action: Action,
+    pub arg: ActionArg<'a>,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
@@ -18,6 +18,18 @@ pub enum Kind {
     Inner,
     Outer,
 }
+impl Kind {
+    pub fn doc_comment_start(self) -> &'static str {
+        match self {
+            Kind::Inner => "\n/*!\n",
+            Kind::Outer => "\n/**\n",
+        }
+    }
+    pub fn doc_comment_end(self) -> &'static str {
+        "\n*/\n"
+    }
+}
+
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub enum Action {
     Start,
@@ -27,14 +39,27 @@ pub enum Action {
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub enum ActionArg<'a> {
     None,
-    Offset(usize),
-    OffsetEnd(usize),
+    Line(usize),
+    LineRev(usize),
     Text(&'a str),
+}
+
+pub enum Mismatch {
+    Kind,
+    Path,
+}
+impl Mismatch {
+    pub fn message(&self) -> &'static str {
+        match self {
+            Mismatch::Kind => "mismatch attribute kind.",
+            Mismatch::Path => "mismatch include path.",
+        }
+    }
 }
 
 static RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        r#"(?ms:^\s*//\s*#(!?)\[\s*include_doc\s*\(\s*"([^"]*)"\s*,\s*(start|end)\s*(?:\(\s*(?:"([^"]*)"|(-)?([0-9]+))\s*\)\s*)?\)\s*\]\s*$)"#,
+        r#"(?ms:^[ \t]*//[ \t]*#(!?)\[[ \t]*include_doc(?:[ \t]*\([ \t]*"([^"]*)"[ \t]*,[ \t]*(start|end)[ \t]*(?:\([ \t]*(?:"([^"]*)"|(-)?([0-9]+))[ \t]*\)[ \t]*)?\)[ \t]*|.*)\][ \t]*$)"#,
     )
     .unwrap()
 });
@@ -57,9 +82,9 @@ impl<'a> Attr<'a> {
         } else if let Some(c5) = c.get(6) {
             let value = c5.as_str().parse().ok()?;
             if c.get(5).is_some() {
-                ActionArg::OffsetEnd(value)
+                ActionArg::LineRev(value)
             } else {
-                ActionArg::Offset(value)
+                ActionArg::Line(value)
             }
         } else {
             ActionArg::None
@@ -72,10 +97,33 @@ impl<'a> Attr<'a> {
             arg,
         })
     }
+    pub fn mismatch(&self, other: &Self) -> Option<Mismatch> {
+        if self.kind != other.kind {
+            Some(Mismatch::Kind)
+        } else if self.path != other.path {
+            Some(Mismatch::Path)
+        } else {
+            None
+        }
+    }
+    pub fn range(&self) -> Range<usize> {
+        self.range.clone()
+    }
+
     pub fn find_iter(text: &'a str) -> impl Iterator<Item = Result<Attr, BadAttrError>> {
         RE.captures_iter(text).map(|c| {
             Self::from_captures(&c).ok_or_else(|| BadAttrError::from_match(c.get(0).unwrap()))
         })
+    }
+    pub fn message(&self, rel_path: impl Display, input: &str) -> String {
+        let p = TextPos::from_str_offset(input, self.range.start);
+        format!(
+            r"--> {}:{}
+  {}",
+            rel_path,
+            p.line,
+            &input[self.range()]
+        )
     }
 }
 
@@ -87,6 +135,20 @@ pub struct BadAttrError {
 impl BadAttrError {
     fn from_match(m: Match) -> Self {
         Self { range: m.range() }
+    }
+    pub fn message(&self, rel_path: impl Display, input: &str) -> String {
+        let p = TextPos::from_str_offset(input, self.range.start);
+        format!(
+            r"invalid attribute
+--> {}:{}
+  {}",
+            rel_path,
+            p.line,
+            &input[self.range()]
+        )
+    }
+    pub fn range(&self) -> Range<usize> {
+        self.range.clone()
     }
 }
 
@@ -174,7 +236,7 @@ mod tests {
             Kind::Outer,
             "abc",
             Action::Start,
-            ActionArg::Offset(10),
+            ActionArg::Line(10),
         );
     }
     #[test]
@@ -184,7 +246,7 @@ mod tests {
             Kind::Outer,
             "abc",
             Action::Start,
-            ActionArg::OffsetEnd(10),
+            ActionArg::LineRev(10),
         );
     }
 
@@ -218,15 +280,51 @@ mod tests {
     fn find_attr_1() {
         check_find_iter(
             r#"
-// #[include_doc("abc",end)]        
+// #[include_doc("abc", start)]
 "#,
             vec![Ok(Attr {
-                range: 0..0,
+                range: 1..32,
                 kind: Kind::Outer,
                 path: "abc",
-                action: Action::End,
+                action: Action::Start,
                 arg: ActionArg::None,
             })],
+        );
+    }
+
+    #[test]
+    fn find_attr_2() {
+        check_find_iter(
+            r#"
+// #[include_doc("abc", start)]
+// #[include_doc("abc", end)]
+"#,
+            vec![
+                Ok(Attr {
+                    range: 1..32,
+                    kind: Kind::Outer,
+                    path: "abc",
+                    action: Action::Start,
+                    arg: ActionArg::None,
+                }),
+                Ok(Attr {
+                    range: 33..62,
+                    kind: Kind::Outer,
+                    path: "abc",
+                    action: Action::End,
+                    arg: ActionArg::None,
+                }),
+            ],
+        );
+    }
+
+    #[test]
+    fn find_attr_error() {
+        check_find_iter(
+            r#"
+// #[include_doc("abc", unknown)]
+"#,
+            vec![Err(BadAttrError { range: 1..34 })],
         );
     }
 }
