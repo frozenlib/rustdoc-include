@@ -59,7 +59,7 @@ impl Mismatch {
 
 static RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        r#"(?ms:^[ \t]*//[ \t]*#(!?)\[[ \t]*include_doc(?:[ \t]*\([ \t]*"([^"]*)"[ \t]*,[ \t]*(start|end)[ \t]*(?:\([ \t]*(?:"([^"]*)"|(-)?([0-9]+))[ \t]*\)[ \t]*)?\)[ \t]*|.*)\][ \t]*$)"#,
+        r#"(?m:^[ \t]*//[ \t]*#(!?)\[[ \t]*include_doc(?:[ \t]*\([ \t]*"([^"]*)"[ \t]*,[ \t]*(start|end)[ \t]*(?:\([ \t]*(?:"([^"]*)"|(-)?([0-9]+))[ \t]*\)[ \t]*)?\)[ \t]*|.*)\][ \t]*$)"#,
     )
     .unwrap()
 });
@@ -325,6 +325,19 @@ mod tests {
 // #[include_doc("abc", unknown)]
 "#,
             vec![Err(BadAttrError { range: 1..34 })],
+        );
+    }
+    #[test]
+    fn find_attr_error2() {
+        check_find_iter(
+            r#"
+// #[include_doc("abc", unknown)]
+// #[include_doc("abc", unknown)]
+"#,
+            vec![
+                Err(BadAttrError { range: 1..34 }),
+                Err(BadAttrError { range: 35..68 }),
+            ],
         );
     }
 }
