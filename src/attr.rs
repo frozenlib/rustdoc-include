@@ -1,8 +1,9 @@
-use crate::text_pos::TextPos;
+use crate::fmt::*;
+use crate::text_pos::*;
 use colored::Colorize;
 use once_cell::sync::Lazy;
 use regex::{Captures, Match, Regex};
-use std::{fmt::Display, ops::Range};
+use std::{ops::Range, path::Path};
 use thiserror::Error;
 
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -116,20 +117,19 @@ impl<'a> Attr<'a> {
             Self::from_captures(&c).ok_or_else(|| BadAttrError::from_match(c.get(0).unwrap()))
         })
     }
+    pub fn find_may_bad(text: &str) -> Option<Range<usize>> {
+        Some(RE.find(text)?.range())
+    }
 
-    pub fn message(&self, rel_path: impl Display, input: &str) -> String {
+    pub fn message(&self, rel_path: &Path, input: &str) -> String {
         format!(
-            "--> {}:{}\n {} {}",
-            rel_path,
-            self.line_str(input),
-            "|".cyan().bold(),
-            &input[self.range()]
+            "{}\n{}",
+            fmt_link(rel_path, self.line(input)),
+            fmt_source(vec![("", &input[self.range()])]),
         )
     }
-    pub fn line_str(&self, input: &str) -> String {
-        TextPos::from_str_offset(input, self.range.start)
-            .line
-            .to_string()
+    pub fn line(&self, input: &str) -> usize {
+        to_line(input, self.range.start)
     }
 }
 
@@ -142,14 +142,13 @@ impl BadAttrError {
     fn from_match(m: Match) -> Self {
         Self { range: m.range() }
     }
-    pub fn message(&self, rel_path: impl Display, input: &str) -> String {
+    pub fn message(&self, rel_path: &Path, input: &str) -> String {
         let p = TextPos::from_str_offset(input, self.range.start);
         format!(
             r"invalid attribute
---> {}:{}
+{}
  {} {}",
-            rel_path,
-            p.line,
+            fmt_link(rel_path, p.line),
             "|".cyan().bold(),
             &input[self.range()]
         )

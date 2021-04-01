@@ -23,6 +23,9 @@ impl TextPos {
         value
     }
 }
+pub fn to_line(s: &str, offset: usize) -> usize {
+    TextPos::from_str_offset(s, offset).line
+}
 
 #[test]
 fn text_pos_from_str_offset() {

@@ -1,16 +1,19 @@
+use crate::fmt::*;
+use crate::text_pos::*;
 use anyhow::{bail, Result};
 use colored::*;
 use ignore::Walk;
 use std::{
-    cmp::max,
     ffi::OsStr,
     fs::read,
     fs::write,
+    ops::Range,
     path::{Path, PathBuf},
 };
 use structopt::StructOpt;
 
 mod attr;
+mod fmt;
 mod text_pos;
 
 use attr::{Attr, BadAttrError};
@@ -179,14 +182,26 @@ fn apply<'a>(root: &Path, base: &Path, input: &'a str) -> Result<ApplyResult, Ap
             let source = start.path;
             match include(root, base, source) {
                 Ok(s) => {
+                    let source_rel_path = s.rel_path;
                     let text_new = trim(&s.text, &start, &end)?;
                     let is_modified = if let Some(text_old) = get_old_text(input, &start, &end) {
                         text_old != text_new
                     } else {
                         true
                     };
-                    text_is_modified |= is_modified;
-                    let source_rel_path = s.rel_path;
+                    if is_modified {
+                        text_is_modified = is_modified;
+                        if let Some(source_range) = Attr::find_may_bad(&text_new) {
+                            return Err(ApplyError::SourceContent {
+                                attr: start,
+                                source_range,
+                                source_rel_path,
+                                source_text: text_new.to_string(),
+                                reason: "source file contains attribute".into(),
+                            });
+                        }
+                    }
+
                     text.push_str(text_new);
                     logs.push(LogEntry {
                         source_rel_path,
@@ -194,7 +209,7 @@ fn apply<'a>(root: &Path, base: &Path, input: &'a str) -> Result<ApplyResult, Ap
                     });
                 }
                 Err(e) => {
-                    return Err(ApplyError::ReadSource {
+                    return Err(ApplyError::SourceRead {
                         attr: start,
                         reason: e.to_string(),
                     });
@@ -253,14 +268,20 @@ enum ApplyError<'a> {
         mismatch: attr::Mismatch,
     },
     TextNofFound(Attr<'a>),
-    ReadSource {
+    SourceRead {
         attr: Attr<'a>,
+        reason: String,
+    },
+    SourceContent {
+        attr: Attr<'a>,
+        source_rel_path: PathBuf,
+        source_text: String,
+        source_range: Range<usize>,
         reason: String,
     },
 }
 impl<'a> ApplyError<'a> {
     fn to_error_message(&self, rel_path: &Path, input: &str) -> String {
-        let rel_path = rel_path.display();
         match self {
             ApplyError::BadAttr(e) => e.message(rel_path, input),
             ApplyError::MissingAttr(attr) => {
@@ -275,24 +296,17 @@ impl<'a> ApplyError<'a> {
                 end,
                 mismatch,
             } => {
-                let start_line = start.line_str(input);
-                let end_line = end.line_str(input);
-                let line_width = max(start_line.len(), end_line.len());
-
+                let start_line = start.line(input);
+                let end_line = end.line(input);
                 format!(
-                    r"{}
---> {rel_path}:{start_line}
---> {rel_path}:{end_line}
-{start_line:>line_width$} {sep} {start_text}
-{end_line:>line_width$} {sep} {end_text}",
+                    r"{}\n{}\n{}\n{}",
                     mismatch.message(),
-                    rel_path = rel_path,
-                    start_line = start_line,
-                    start_text = &input[start.range()],
-                    end_line = end_line,
-                    end_text = &input[end.range()],
-                    sep = "|".cyan().bold(),
-                    line_width = line_width,
+                    fmt_link(rel_path, start_line),
+                    fmt_link(rel_path, end_line),
+                    fmt_source(vec![
+                        (start_line, &input[start.range()]),
+                        (end_line, &input[end.range()])
+                    ])
                 )
             }
             ApplyError::TextNofFound(attr) => {
@@ -302,12 +316,29 @@ impl<'a> ApplyError<'a> {
                 };
                 format!("{}\n{}", msg, attr.message(rel_path, input))
             }
-            ApplyError::ReadSource { attr, reason } => format!(
+            ApplyError::SourceRead { attr, reason } => format!(
                 "cannot read `{}` ({})\n{}",
                 attr.path,
                 reason,
                 attr.message(rel_path, input)
             ),
+            ApplyError::SourceContent {
+                attr,
+                source_rel_path,
+                source_text,
+                source_range,
+                reason,
+            } => {
+                let line = attr.line(input);
+                let source_line = to_line(&source_text, source_range.start);
+                format!(
+                    "{}\n{}\n{}\n{}",
+                    reason,
+                    fmt_link(rel_path, line),
+                    fmt_link(source_rel_path, source_line),
+                    fmt_source(vec![("", &source_text[source_range.clone()])])
+                )
+            }
         }
     }
 }
