@@ -1,4 +1,4 @@
-// #[include_doc("example.md", start)]
+// #[include_doc("example.md+", start)]
 /**
 this is example function.
 */

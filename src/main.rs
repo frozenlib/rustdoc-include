@@ -299,7 +299,7 @@ impl<'a> ApplyError<'a> {
                 let start_line = start.line(input);
                 let end_line = end.line(input);
                 format!(
-                    r"{}\n{}\n{}\n{}",
+                    "{}\n{}\n{}\n{}",
                     mismatch.message(),
                     fmt_link(rel_path, start_line),
                     fmt_link(rel_path, end_line),
