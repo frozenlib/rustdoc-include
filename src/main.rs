@@ -156,17 +156,12 @@ fn line_offset_rev(text: &str, mut line: usize) -> usize {
     }
     0
 }
-fn get_old_text<'a>(text: &'a str, start: &Attr, end: &Attr) -> Option<&'a str> {
-    let text = &text[start.range.end..end.range.start];
-    let kind = start.kind;
-    if !text.starts_with(kind.doc_comment_start()) {
-        return None;
+fn is_modified(text_new: &str, text_old: &str, start: &Attr, end: &Attr) -> bool {
+    let old_text = &text_old[start.range.end..end.range.start];
+    if !old_text.starts_with("\n") {
+        return true;
     }
-    let text = &text[kind.doc_comment_start().len()..];
-    if !text.ends_with(kind.doc_comment_end()) {
-        return None;
-    }
-    Some(&text[..text.len() - kind.doc_comment_end().len()])
+    text_new != &old_text[1..]
 }
 fn apply<'a>(root: &Path, base: &Path, input: &'a str) -> Result<ApplyResult, ApplyError<'a>> {
     let mut logs = Vec::new();
@@ -178,17 +173,16 @@ fn apply<'a>(root: &Path, base: &Path, input: &'a str) -> Result<ApplyResult, Ap
         if let Some((start, end)) = make_pair(&mut attr_start, attr)? {
             let kind = start.kind;
             text.push_str(&input[last_offset..start.range.end]);
-            text.push_str(kind.doc_comment_start());
+            text.push('\n');
             let source = start.path;
             match include(root, base, source) {
                 Ok(s) => {
                     let source_rel_path = s.rel_path;
-                    let text_new = trim(&s.text, &start, &end)?;
-                    let is_modified = if let Some(text_old) = get_old_text(input, &start, &end) {
-                        text_old != text_new
-                    } else {
-                        true
-                    };
+                    let text_new = to_doc_comment(
+                        trim(&s.text, &start, &end)?,
+                        start.kind.doc_comment_prefix(),
+                    );
+                    let is_modified = is_modified(&text_new, input, &start, &end);
                     if is_modified {
                         text_is_modified = is_modified;
                         if let Some(source_range) = Attr::find_may_bad(&text_new) {
@@ -202,7 +196,7 @@ fn apply<'a>(root: &Path, base: &Path, input: &'a str) -> Result<ApplyResult, Ap
                         }
                     }
 
-                    text.push_str(text_new);
+                    text.push_str(&text_new);
                     logs.push(LogEntry {
                         source_rel_path,
                         is_modified,
@@ -215,7 +209,6 @@ fn apply<'a>(root: &Path, base: &Path, input: &'a str) -> Result<ApplyResult, Ap
                     });
                 }
             }
-            text.push_str(kind.doc_comment_end());
             last_offset = end.range.start;
         }
     }
@@ -239,6 +232,15 @@ fn include(root: &Path, base: &Path, source: &str) -> Result<IncludeResult> {
     } else {
         bail!("source is out of root");
     }
+}
+fn to_doc_comment(s: &str, prefix: &str) -> String {
+    let mut r = String::new();
+    for line in s.lines() {
+        r.push_str(prefix);
+        r.push_str(line);
+        r.push('\n');
+    }
+    r
 }
 
 #[derive(StructOpt)]

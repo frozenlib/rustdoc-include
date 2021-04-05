@@ -30,6 +30,12 @@ impl Kind {
     pub fn doc_comment_end(self) -> &'static str {
         "\n*/\n"
     }
+    pub fn doc_comment_prefix(self) -> &'static str {
+        match self {
+            Kind::Inner => "//! ",
+            Kind::Outer => "/// ",
+        }
+    }
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
