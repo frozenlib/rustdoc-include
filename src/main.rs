@@ -171,7 +171,6 @@ fn apply<'a>(root: &Path, base: &Path, input: &'a str) -> Result<ApplyResult, Ap
     let mut last_offset = 0;
     for attr in Attr::find_iter(input) {
         if let Some((start, end)) = make_pair(&mut attr_start, attr)? {
-            let kind = start.kind;
             text.push_str(&input[last_offset..start.range.end]);
             text.push('\n');
             let source = start.path;
