@@ -220,11 +220,13 @@ fn include(root: &Path, base: &Path, source: &str) -> Result<IncludeResult> {
 }
 fn to_doc_comment(s: &str, prefix: &str) -> String {
     let mut r = String::new();
+    r.push('\n');
     for line in s.lines() {
         r.push_str(prefix);
         r.push_str(line);
         r.push('\n');
     }
+    r.push('\n');
     r
 }
 
