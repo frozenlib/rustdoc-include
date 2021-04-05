@@ -114,9 +114,6 @@ impl<'a> Attr<'a> {
             Self::from_captures(&c).ok_or_else(|| BadAttrError::from_match(c.get(0).unwrap()))
         })
     }
-    pub fn find_may_bad(text: &str) -> Option<Range<usize>> {
-        Some(RE.find(text)?.range())
-    }
 
     pub fn message(&self, rel_path: &Path, input: &str) -> String {
         format!(

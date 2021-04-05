@@ -1,5 +1,4 @@
 use crate::fmt::*;
-use crate::text_pos::*;
 use anyhow::{bail, Result};
 use colored::*;
 use ignore::Walk;
@@ -7,7 +6,6 @@ use std::{
     ffi::OsStr,
     fs::read,
     fs::write,
-    ops::Range,
     path::{Path, PathBuf},
 };
 use structopt::StructOpt;
@@ -182,19 +180,7 @@ fn apply<'a>(root: &Path, base: &Path, input: &'a str) -> Result<ApplyResult, Ap
                         start.kind.doc_comment_prefix(),
                     );
                     let is_modified = is_modified(&text_new, input, &start, &end);
-                    if is_modified {
-                        text_is_modified = is_modified;
-                        if let Some(source_range) = Attr::find_may_bad(&text_new) {
-                            return Err(ApplyError::SourceContent {
-                                attr: start,
-                                source_range,
-                                source_rel_path,
-                                source_text: text_new.to_string(),
-                                reason: "source file contains attribute".into(),
-                            });
-                        }
-                    }
-
+                    text_is_modified |= is_modified;
                     text.push_str(&text_new);
                     logs.push(LogEntry {
                         source_rel_path,
@@ -273,13 +259,6 @@ enum ApplyError<'a> {
         attr: Attr<'a>,
         reason: String,
     },
-    SourceContent {
-        attr: Attr<'a>,
-        source_rel_path: PathBuf,
-        source_text: String,
-        source_range: Range<usize>,
-        reason: String,
-    },
 }
 impl<'a> ApplyError<'a> {
     fn to_error_message(&self, rel_path: &Path, input: &str) -> String {
@@ -323,23 +302,6 @@ impl<'a> ApplyError<'a> {
                 reason,
                 attr.message(rel_path, input)
             ),
-            ApplyError::SourceContent {
-                attr,
-                source_rel_path,
-                source_text,
-                source_range,
-                reason,
-            } => {
-                let line = attr.line(input);
-                let source_line = to_line(&source_text, source_range.start);
-                format!(
-                    "{}\n{}\n{}\n{}",
-                    reason,
-                    fmt_link(rel_path, line),
-                    fmt_link(source_rel_path, source_line),
-                    fmt_source(vec![("", &source_text[source_range.clone()])])
-                )
-            }
         }
     }
 }
