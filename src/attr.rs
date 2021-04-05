@@ -21,15 +21,6 @@ pub enum Kind {
     Outer,
 }
 impl Kind {
-    pub fn doc_comment_start(self) -> &'static str {
-        match self {
-            Kind::Inner => "\n/*!\n",
-            Kind::Outer => "\n/**\n",
-        }
-    }
-    pub fn doc_comment_end(self) -> &'static str {
-        "\n*/\n"
-    }
     pub fn doc_comment_prefix(self) -> &'static str {
         match self {
             Kind::Inner => "//! ",
