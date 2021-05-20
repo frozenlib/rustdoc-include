@@ -20,7 +20,7 @@ Next, create a markdown file with the path specified in the comment you just add
 this is main function.
 ```
 
-Run `include-doc` with the `--root` option to specify the path to the directory containing rust source code and markdown.
+Run `include-doc` with the `--root` option to specify the path to the directory containing rust source code and markdown file.
 
 ```sh
 include-doc --root ./
@@ -39,7 +39,7 @@ This tool will update the rust source code to look like this
 fn main() {}
 ```
 
-This tool replaces the area enclosed by `// #[include_doc("{filepath}", start)]` and `// #[include_doc("{filepath}", end)]` with the contents of the markdown file. So if you run the same command after updating the markdown file, you can synchronize the doc comment in the source code with the external markdown file.
+This tool replaces the area enclosed by `// #[include_doc("{filepath}", start)]` and `// #[include_doc("{filepath}", end)]` with the contents of the markdown file. So if you rerun the same command after updating the markdown file, you can synchronize the doc comment in the source code with the external markdown file.
 
 ## Import doc comments for enclosing item
 
