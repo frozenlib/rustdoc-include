@@ -156,7 +156,7 @@ fn line_offset_rev(text: &str, mut line: usize) -> usize {
 }
 fn is_modified(text_new: &str, text_old: &str, start: &Attr, end: &Attr) -> bool {
     let old_text = &text_old[start.range.end..end.range.start];
-    if !old_text.starts_with("\n") {
+    if !old_text.starts_with('\n') {
         return true;
     }
     text_new != &old_text[1..]

@@ -163,7 +163,9 @@ mod tests {
             action,
             arg,
         };
-        let c = RE.captures(s).expect(&format!("not match `{}`", s));
+        let c = RE
+            .captures(s)
+            .unwrap_or_else(|| panic!("{}", format!("not match `{}`", s)));
         let value = Attr::from_captures(&c).expect("cannot crate attr from capture");
         assert_eq!(value, expected, "input = `{}`", s);
     }

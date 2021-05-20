@@ -158,8 +158,9 @@
       "args": [
         "clippy",
         "--all-features",
-        "--target-dir",
-        "target/clippy",
+        "--tests",
+        "--bin",
+        "include-doc",
         "--",
         "-W",
         "clippy::all"
