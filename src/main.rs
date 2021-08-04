@@ -50,7 +50,7 @@ fn run() -> Result<()> {
                             }
                         }
                         Err(e) => {
-                            bail!("{}", e.to_error_message(&rel_path, &input));
+                            bail!("{}", e.to_error_message(rel_path, &input));
                         }
                     }
                 }
@@ -271,7 +271,7 @@ impl<'a> ApplyError<'a> {
                     attr::Action::Start => "missing end attribute",
                     attr::Action::End => "missing start attribute",
                 };
-                format!("{}\n{}", msg, attr.message(&rel_path, input))
+                format!("{}\n{}", msg, attr.message(rel_path, input))
             }
             ApplyError::MismatchAttr {
                 start,
@@ -352,8 +352,8 @@ mod tests {
     fn check_convert_file(dir: &Path, input_path: &Path, expected_path: &Path) -> Result<()> {
         let input_str = String::from_utf8(read(input_path)?)?;
         let expected_str = String::from_utf8(read(expected_path)?)?;
-        let input_rel_path = input_path.strip_prefix(&dir).unwrap_or(&input_path);
-        match apply(&dir, &dir, &input_str) {
+        let input_rel_path = input_path.strip_prefix(&dir).unwrap_or(input_path);
+        match apply(dir, dir, &input_str) {
             Ok(x) => {
                 let output_str = if let Some(text) = &x.text {
                     text
