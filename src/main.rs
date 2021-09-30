@@ -221,9 +221,12 @@ fn include(root: &Path, base: &Path, source: &str) -> Result<IncludeResult> {
 fn to_doc_comment(s: &str, prefix: &str) -> String {
     let mut r = String::new();
     r.push('\n');
+    let mut buf = String::new();
     for line in s.lines() {
-        r.push_str(prefix);
-        r.push_str(line);
+        buf.clear();
+        buf.push_str(prefix);
+        buf.push_str(line);
+        r.push_str(buf.trim_end());
         r.push('\n');
     }
     r.push('\n');
