@@ -220,7 +220,6 @@ fn include(root: &Path, base: &Path, source: &str) -> Result<IncludeResult> {
 }
 fn to_doc_comment(s: &str, prefix: &str) -> String {
     let mut r = String::new();
-    r.push('\n');
     let mut buf = String::new();
     for line in s.lines() {
         buf.clear();
@@ -229,7 +228,6 @@ fn to_doc_comment(s: &str, prefix: &str) -> String {
         r.push_str(buf.trim_end());
         r.push('\n');
     }
-    r.push('\n');
     r
 }
 
