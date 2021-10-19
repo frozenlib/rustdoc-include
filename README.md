@@ -32,11 +32,9 @@ This tool will update the rust source code to look like this
 
 ```rust :main.rs
 // #[include_doc("example.md", start)]
-
 /// # Title
 ///
 /// this is main function.
-
 // #[include_doc("example.md", end)]
 fn main() {}
 ```
@@ -45,7 +43,7 @@ This tool replaces the area enclosed by `// #[include_doc("{filepath}", start)]`
 
 ## Import doc comments for enclosing item
 
-You can import an external file as a doc comment for the enclosing item by writing `// #![inlcude_doc(...)]` instead of `// #[inlcude_doc(...)]` as follows
+You can import an external file as a doc comment for the enclosing item by writing `// #![include_doc(...)]` instead of `// #[include_doc(...)]` as follows
 
 ```rust
 // #![include_doc("example.md", start)]
@@ -85,10 +83,8 @@ fn main() {}
 
 ```rs
 // #[include_doc("../doc/example.md", start(2))]
-
 /// - line 2
 /// - line 3
-
 // #[include_doc("../doc/example.md", end)]
 fn main() {}
 ```
@@ -103,7 +99,7 @@ Specifies the ending line number of the range to be imported.
 
 ### `end(-{line_number})`
 
-Specifies the ending line of the range to be imported by specfying number of lines from the end.
+Specifies the ending line of the range to be imported by specifying number of lines from the end.
 
 ### `end("{text}")`
 
