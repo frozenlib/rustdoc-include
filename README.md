@@ -1,6 +1,6 @@
 # include-doc
 
-[![Actions Status](https://github.com/frozenlib/include-doc/workflows/CI/badge.svg)](https://github.com/frozenlib/include-doc/actions)
+[![Actions Status](https://github.com/frozenlib/include-doc/workflows/CI/badge.svg)](https://github.com/frozenlib/include-doc)
 
 This tool imports the contents of an external markdown file into `*.rs` file as doc comment.
 
