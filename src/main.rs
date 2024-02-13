@@ -1,3 +1,5 @@
+#![allow(clippy::result_large_err)]
+
 use crate::fmt::*;
 use anyhow::{bail, Result};
 use colored::*;
@@ -34,7 +36,7 @@ fn run() -> Result<()> {
                 }
                 let rel_path = path.strip_prefix(&args.root).unwrap_or(path);
                 if let Some(base) = path.parent() {
-                    let input = String::from_utf8(read(&path)?)?;
+                    let input = String::from_utf8(read(path)?)?;
                     match apply(&args.root, base, &input) {
                         Ok(result) => {
                             if let Some(text) = result.text {
@@ -320,7 +322,7 @@ mod tests {
     #[test]
     fn test_convert_file() -> Result<()> {
         let dir = Path::new("./tests/data");
-        for e in read_dir(&dir)? {
+        for e in read_dir(dir)? {
             let e = e?;
             if let Some((input, expected)) = to_input_expected(e) {
                 eprint!("test {} ... ", input);
@@ -353,7 +355,7 @@ mod tests {
     fn check_convert_file(dir: &Path, input_path: &Path, expected_path: &Path) -> Result<()> {
         let input_str = String::from_utf8(read(input_path)?)?;
         let expected_str = String::from_utf8(read(expected_path)?)?;
-        let input_rel_path = input_path.strip_prefix(&dir).unwrap_or(input_path);
+        let input_rel_path = input_path.strip_prefix(dir).unwrap_or(input_path);
         match apply(dir, dir, &input_str) {
             Ok(x) => {
                 let output_str = if let Some(text) = &x.text {
