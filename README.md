@@ -1,6 +1,6 @@
-# include-doc
+# rustdoc-include
 
-[![Actions Status](https://github.com/frozenlib/include-doc/workflows/CI/badge.svg)](https://github.com/frozenlib/include-doc)
+[![Actions Status](https://github.com/frozenlib/rustdoc-include/workflows/CI/badge.svg)](https://github.com/frozenlib/rustdoc-include)
 
 This tool imports the contents of an external markdown file into `*.rs` file as doc comment.
 
@@ -22,10 +22,10 @@ Next, create a markdown file with the path specified in the comment you just add
 this is main function.
 ```
 
-Run `include-doc` with the `--root` option to specify the path to the directory containing rust source code and markdown file.
+Run `rustdoc-include` with the `--root` option to specify the path to the directory containing rust source code and markdown file.
 
 ```sh
-include-doc --root ./
+rustdoc-include --root ./
 ```
 
 This tool will update the rust source code to look like this

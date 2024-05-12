@@ -103,7 +103,7 @@
         "--all-features",
         "--tests",
         "--bin",
-        "include-doc",
+        "rustdoc-include",
         "--",
         "-W",
         "clippy::all"
