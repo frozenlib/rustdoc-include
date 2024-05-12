@@ -1,7 +1,7 @@
 use crate::fmt::*;
 use crate::text_pos::*;
-use once_cell::sync::Lazy;
 use regex::{Captures, Match, Regex};
+use std::sync::OnceLock;
 use std::{ops::Range, path::Path};
 use thiserror::Error;
 use yansi::Paint;
@@ -56,12 +56,15 @@ impl Mismatch {
     }
 }
 
-static RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(
-        r#"(?m:^[ \t]*//[ \t]*#(!?)\[[ \t]*include_doc(?:[ \t]*\([ \t]*"([^"]*)"[ \t]*,[ \t]*(start|end)[ \t]*(?:\([ \t]*(?:"([^"]*)"|(-)?([0-9]+))[ \t]*\)[ \t]*)?\)[ \t]*|.*)\][ \t]*$)"#,
-    )
-    .unwrap()
-});
+fn attr_regex() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| {
+        Regex::new(
+            r#"(?m:^[ \t]*//[ \t]*#(!?)\[[ \t]*include_doc(?:[ \t]*\([ \t]*"([^"]*)"[ \t]*,[ \t]*(start|end)[ \t]*(?:\([ \t]*(?:"([^"]*)"|(-)?([0-9]+))[ \t]*\)[ \t]*)?\)[ \t]*|.*)\][ \t]*$)"#,
+        )
+        .unwrap()
+    })
+}
 
 impl<'a> Attr<'a> {
     pub fn from_captures(c: &Captures<'a>) -> Option<Self> {
@@ -110,7 +113,7 @@ impl<'a> Attr<'a> {
     }
 
     pub fn find_iter(text: &'a str) -> impl Iterator<Item = Result<Attr, BadAttrError>> {
-        RE.captures_iter(text).map(|c| {
+        attr_regex().captures_iter(text).map(|c| {
             Self::from_captures(&c).ok_or_else(|| BadAttrError::from_match(c.get(0).unwrap()))
         })
     }
@@ -163,7 +166,7 @@ mod tests {
             action,
             arg,
         };
-        let c = RE
+        let c = attr_regex()
             .captures(s)
             .unwrap_or_else(|| panic!("{}", format!("not match `{}`", s)));
         let value = Attr::from_captures(&c).expect("cannot crate attr from capture");
