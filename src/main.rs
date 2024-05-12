@@ -1,21 +1,21 @@
 #![allow(clippy::result_large_err)]
 
-use crate::fmt::*;
-use anyhow::{bail, Result};
-use ignore::Walk;
 use std::{
     ffi::OsStr,
     fs::read,
     fs::write,
     path::{Path, PathBuf},
 };
-use structopt::StructOpt;
+
+use crate::fmt::*;
+use anyhow::{bail, Result};
+use attr::{Attr, BadAttrError};
+use clap::Parser;
+use ignore::Walk;
 
 mod attr;
 mod fmt;
 mod text_pos;
-
-use attr::{Attr, BadAttrError};
 
 fn main() {
     use yansi::Paint;
@@ -26,7 +26,7 @@ fn main() {
 }
 fn run() -> Result<()> {
     use yansi::Paint;
-    let args = Opt::from_args();
+    let args = Opt::parse();
     for e in Walk::new(&args.root) {
         let e = e?;
         if let Some(t) = e.file_type() {
@@ -234,12 +234,12 @@ fn to_doc_comment(s: &str, prefix: &str) -> String {
     r
 }
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 struct Opt {
-    #[structopt(parse(from_os_str))]
+    #[arg(long)]
     root: PathBuf,
 
-    #[structopt(long = "dry-run")]
+    #[arg(long = "dry-run")]
     dry_run: bool,
 }
 
