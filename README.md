@@ -1,16 +1,62 @@
 # rustdoc-include
 
+[![Crates.io](https://img.shields.io/crates/v/rustdoc-include.svg)](https://crates.io/crates/rustdoc-include)
 [![Actions Status](https://github.com/frozenlib/rustdoc-include/workflows/CI/badge.svg)](https://github.com/frozenlib/rustdoc-include)
 
 This tool imports the contents of an external markdown file into `*.rs` file as doc comment.
+
+## Motivation
+
+In Rust, you can use `#[doc = include_str!("...")]` to import external markdown files in your doc comments. However, when using this method to import code examples, the location of errors in the code examples will not be correctly reported.
+
+For example, consider the following case:
+
+```rs
+// src/lib.rs
+#![doc = include_str!("doc.md")]
+```
+
+````md
+# src/doc.md
+
+```rust
+invalid_func();
+```
+````
+
+```txt
+running 1 test
+test src\lib.rs - (line 4) ... FAILED
+
+failures:
+
+---- src\lib.rs - (line 4) stdout ----
+error[E0425]: cannot find function `invalid_func` in this scope
+ --> src\lib.rs:5:1
+  |
+3 | invalid_func();
+  | ^^^^^^^^^^^^ not found in this scope
+```
+
+The error location is reported as `src/lib.rs:5` instead of `src/doc.md:3`, and IDE jump functionality will not work correctly.
+
+`rustdoc-include` solves this problem by copying the documentation from markdown files and embedding it into `*.rs` files. Furthermore, after initially importing the documentation, you can easily synchronize the `*.rs` files with the markdown files by running `rustdoc-include` again.
+
+## Install
+
+You can install this tool with `cargo install`.
+
+```sh
+cargo install rustdoc-include
+```
 
 ## Usage
 
 First, add `// #[include_doc("{filepath}", start)]` and `// #[include_doc("{filepath}", end)]` to the rust source code as follows
 
 ```rust :main.rs
-// #[include_doc("example.md", start)]
-// #[include_doc("example.md", end)]
+// #[include_doc("file.md", start)]
+// #[include_doc("file.md", end)]
 fn main() {}
 ```
 
@@ -31,11 +77,11 @@ rustdoc-include --root ./
 This tool will update the rust source code to look like this
 
 ```rust :main.rs
-// #[include_doc("example.md", start)]
+// #[include_doc("file.md", start)]
 /// # Title
 ///
 /// this is main function.
-// #[include_doc("example.md", end)]
+// #[include_doc("file.md", end)]
 fn main() {}
 ```
 
@@ -46,8 +92,8 @@ This tool replaces the area enclosed by `// #[include_doc("{filepath}", start)]`
 You can import an external file as a doc comment for the enclosing item by writing `// #![include_doc(...)]` instead of `// #[include_doc(...)]` as follows
 
 ```rust
-// #![include_doc("example.md", start)]
-// #![include_doc("example.md", end)]
+// #![include_doc("file.md", start)]
+// #![include_doc("file.md", end)]
 ```
 
 ### Use relative path
@@ -55,8 +101,8 @@ You can import an external file as a doc comment for the enclosing item by writi
 The path to the imported markdown file can also be specified relative to the source file.
 
 ```rust
-// #[include_doc("../doc/example.md", start)]
-// #[include_doc("../doc/example.md", end)]
+// #[include_doc("../dir/file.md", start)]
+// #[include_doc("../dir/file.md", end)]
 ```
 
 However, it is not possible to import files outside the directory specified by the `--root` option.
@@ -76,16 +122,16 @@ Specifies the starting line number of the range to be imported.
 ```
 
 ```rs
-// #[include_doc("../doc/example.md", start(2))]
-// #[include_doc("../doc/example.md", end)]
+// #[include_doc("file.md", start(2))]
+// #[include_doc("file.md", end)]
 fn main() {}
 ```
 
 ```rs
-// #[include_doc("../doc/example.md", start(2))]
+// #[include_doc("file.md", start(2))]
 /// - line 2
 /// - line 3
-// #[include_doc("../doc/example.md", end)]
+// #[include_doc("file.md", end)]
 fn main() {}
 ```
 
