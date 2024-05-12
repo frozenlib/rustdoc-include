@@ -2,7 +2,6 @@
 
 use crate::fmt::*;
 use anyhow::{bail, Result};
-use colored::*;
 use ignore::Walk;
 use std::{
     ffi::OsStr,
@@ -19,12 +18,14 @@ mod text_pos;
 use attr::{Attr, BadAttrError};
 
 fn main() {
+    use yansi::Paint;
     if let Err(e) = run() {
         eprintln!("{}: {}", "error".red().bold(), e);
         std::process::exit(1);
     }
 }
 fn run() -> Result<()> {
+    use yansi::Paint;
     let args = Opt::from_args();
     for e in Walk::new(&args.root) {
         let e = e?;
@@ -321,6 +322,7 @@ mod tests {
     };
     #[test]
     fn test_convert_file() -> Result<()> {
+        use yansi::Paint;
         let dir = Path::new("./tests/data");
         for e in read_dir(dir)? {
             let e = e?;

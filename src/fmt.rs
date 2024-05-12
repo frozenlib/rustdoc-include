@@ -1,7 +1,8 @@
-use colored::Colorize;
 use std::fmt::Display;
 use std::fmt::Write;
 use std::path::Path;
+
+use yansi::Paint;
 
 pub fn fmt_link(rel_path: &Path, line: usize) -> String {
     format!("--> {}:{}", rel_path.display(), line)

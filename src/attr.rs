@@ -1,10 +1,10 @@
 use crate::fmt::*;
 use crate::text_pos::*;
-use colored::Colorize;
 use once_cell::sync::Lazy;
 use regex::{Captures, Match, Regex};
 use std::{ops::Range, path::Path};
 use thiserror::Error;
+use yansi::Paint;
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct Attr<'a> {
