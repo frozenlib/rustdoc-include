@@ -11,7 +11,7 @@ In Rust, you can use `#[doc = include_str!("...")]` to import external markdown 
 
 For example, consider the following case:
 
-```rs
+```rust
 // src/lib.rs
 #![doc = include_str!("doc.md")]
 ```
@@ -40,7 +40,9 @@ error[E0425]: cannot find function `invalid_func` in this scope
 
 The error location is reported as `src/lib.rs:5` instead of `src/doc.md:3`, and IDE jump functionality will not work correctly.
 
-`rustdoc-include` solves this problem by copying the documentation from markdown files and embedding it into `*.rs` files. Furthermore, after initially importing the documentation, you can easily synchronize the `*.rs` files with the markdown files by running `rustdoc-include` again.
+`rustdoc-include` solves this problem by copying the documentation from markdown files and embedding it into `*.rs` files.
+
+Furthermore, after initially importing the documentation, you can easily synchronize the `*.rs` files with the markdown files by running `rustdoc-include` again.
 
 ## Install
 
