@@ -1,10 +1,10 @@
 [package]
 name = "rustdoc-include"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["frozenlib"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
-readme = "../README.md"
+readme = "README.md"
 repository = "https://github.com/frozenlib/rustdoc-include"
 documentation = "https://docs.rs/rustdoc-include/"
 keywords = ["rustdoc", "include", "import", "doc", "comment"]
