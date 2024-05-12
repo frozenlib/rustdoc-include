@@ -3,6 +3,13 @@ name = "rustdoc-include"
 version = "0.1.1"
 authors = ["frozenlib"]
 edition = "2021"
+license = "MIT OR Apache-2.0"
+readme = "../README.md"
+repository = "https://github.com/frozenlib/rustdoc-include"
+documentation = "https://docs.rs/rustdoc-include/"
+keywords = ["rustdoc", "include", "import", "doc", "comment"]
+categories = ["development-tools"]
+description = "A utility for importing external Markdown files into `*.rs` file as doc comments."
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

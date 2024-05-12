@@ -3,7 +3,7 @@
 [![Crates.io](https://img.shields.io/crates/v/rustdoc-include.svg)](https://crates.io/crates/rustdoc-include)
 [![Actions Status](https://github.com/frozenlib/rustdoc-include/workflows/CI/badge.svg)](https://github.com/frozenlib/rustdoc-include)
 
-This tool imports the contents of an external markdown file into `*.rs` file as doc comment.
+A utility for importing external Markdown files into `*.rs` file as doc comments.
 
 ## Motivation
 
