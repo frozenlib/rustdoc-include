@@ -1,5 +1,6 @@
 use crate::fmt::*;
 use crate::text_pos::*;
+use regex::RegexBuilder;
 use regex::{Captures, Match, Regex};
 use std::sync::OnceLock;
 use std::{ops::Range, path::Path};
@@ -59,10 +60,9 @@ impl Mismatch {
 fn attr_regex() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| {
-        Regex::new(
+        RegexBuilder::new(
             r#"(?m:^[ \t]*//[ \t]*#(!?)\[[ \t]*include_doc(?:[ \t]*\([ \t]*"([^"]*)"[ \t]*,[ \t]*(start|end)[ \t]*(?:\([ \t]*(?:"([^"]*)"|(-)?([0-9]+))[ \t]*\)[ \t]*)?\)[ \t]*|.*)\][ \t]*$)"#,
-        )
-        .unwrap()
+        ).crlf(true).build().unwrap()
     })
 }
 
@@ -343,6 +343,20 @@ mod tests {
                 Err(BadAttrError { range: 1..34 }),
                 Err(BadAttrError { range: 35..68 }),
             ],
+        );
+    }
+
+    #[test]
+    fn find_attr_start_crlf() {
+        check_find_iter(
+            "\r\n// #[include_doc(\"abc\", start)]\r\n",
+            vec![Ok(Attr {
+                range: 2..33,
+                kind: Kind::Outer,
+                path: "abc",
+                action: Action::Start,
+                arg: ActionArg::None,
+            })],
         );
     }
 }

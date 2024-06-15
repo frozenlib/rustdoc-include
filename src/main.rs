@@ -159,10 +159,13 @@ fn line_offset_rev(text: &str, mut line: usize) -> usize {
 }
 fn is_modified(text_new: &str, text_old: &str, start: &Attr, end: &Attr) -> bool {
     let old_text = &text_old[start.range.end..end.range.start];
-    if !old_text.starts_with('\n') {
-        return true;
+    if old_text.starts_with('\n') {
+        text_new != &old_text[1..]
+    } else if old_text.starts_with("\r\n") {
+        text_new != &old_text[2..]
+    } else {
+        true
     }
-    text_new != &old_text[1..]
 }
 fn apply<'a>(root: &Path, base: &Path, input: &'a str) -> Result<ApplyResult, ApplyError<'a>> {
     let mut logs = Vec::new();
@@ -170,10 +173,11 @@ fn apply<'a>(root: &Path, base: &Path, input: &'a str) -> Result<ApplyResult, Ap
     let mut text = String::new();
     let mut text_is_modified = false;
     let mut last_offset = 0;
+    let eol = detect_eol(input);
     for attr in Attr::find_iter(input) {
         if let Some((start, end)) = make_pair(&mut attr_start, attr)? {
             text.push_str(&input[last_offset..start.range.end]);
-            text.push('\n');
+            text.push_str(eol);
             let source = start.path;
             match include(root, base, source) {
                 Ok(s) => {
@@ -181,6 +185,7 @@ fn apply<'a>(root: &Path, base: &Path, input: &'a str) -> Result<ApplyResult, Ap
                     let text_new = to_doc_comment(
                         trim(&s.text, &start, &end)?,
                         start.kind.doc_comment_prefix(),
+                        eol,
                     );
                     let is_modified = is_modified(&text_new, input, &start, &end);
                     text_is_modified |= is_modified;
@@ -205,6 +210,17 @@ fn apply<'a>(root: &Path, base: &Path, input: &'a str) -> Result<ApplyResult, Ap
     Ok(ApplyResult { text, logs })
 }
 
+fn detect_eol(s: &str) -> &str {
+    if let Some(i) = s.find('\n') {
+        if let Some(ch) = s[..i].chars().last() {
+            if ch == '\r' {
+                return "\r\n";
+            }
+        }
+    }
+    "\n"
+}
+
 struct IncludeResult {
     rel_path: PathBuf,
     text: String,
@@ -221,7 +237,7 @@ fn include(root: &Path, base: &Path, source: &str) -> Result<IncludeResult> {
         bail!("source is out of root");
     }
 }
-fn to_doc_comment(s: &str, prefix: &str) -> String {
+fn to_doc_comment(s: &str, prefix: &str, eol: &str) -> String {
     let mut r = String::new();
     let mut buf = String::new();
     for line in s.lines() {
@@ -229,7 +245,7 @@ fn to_doc_comment(s: &str, prefix: &str) -> String {
         buf.push_str(prefix);
         buf.push_str(line);
         r.push_str(buf.trim_end());
-        r.push('\n');
+        r.push_str(eol);
     }
     r
 }
