@@ -282,7 +282,7 @@ enum ApplyError<'a> {
         reason: String,
     },
 }
-impl<'a> ApplyError<'a> {
+impl ApplyError<'_> {
     fn to_error_message(&self, rel_path: &Path, input: &str) -> String {
         match self {
             ApplyError::BadAttr(e) => e.message(rel_path, input),

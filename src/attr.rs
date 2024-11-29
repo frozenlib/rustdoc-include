@@ -112,7 +112,7 @@ impl<'a> Attr<'a> {
         self.range.clone()
     }
 
-    pub fn find_iter(text: &'a str) -> impl Iterator<Item = Result<Attr, BadAttrError>> {
+    pub fn find_iter(text: &'a str) -> impl Iterator<Item = Result<Attr<'a>, BadAttrError>> {
         attr_regex().captures_iter(text).map(|c| {
             Self::from_captures(&c).ok_or_else(|| BadAttrError::from_match(c.get(0).unwrap()))
         })
