@@ -343,7 +343,7 @@ mod tests {
         for e in read_dir(dir)? {
             let e = e?;
             if let Some((input, expected)) = to_input_expected(e) {
-                eprint!("test {} ... ", input);
+                eprint!("test {input} ... ");
                 match check_convert_file(dir, &dir.join(input), &dir.join(expected)) {
                     Ok(_) => {
                         eprintln!("{}", "ok".green());

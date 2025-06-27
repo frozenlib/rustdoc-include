@@ -168,9 +168,9 @@ mod tests {
         };
         let c = attr_regex()
             .captures(s)
-            .unwrap_or_else(|| panic!("{}", format!("not match `{}`", s)));
+            .unwrap_or_else(|| panic!("{}", format!("not match `{s}`")));
         let value = Attr::from_captures(&c).expect("cannot crate attr from capture");
-        assert_eq!(value, expected, "input = `{}`", s);
+        assert_eq!(value, expected, "input = `{s}`");
     }
 
     #[test]

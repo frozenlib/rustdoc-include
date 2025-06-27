@@ -27,7 +27,7 @@ pub fn fmt_source<'a, L: Display>(lines: impl IntoIterator<Item = (L, &'a str)>)
             s.push_str(&line);
             s.push(' ');
         }
-        write!(&mut s, "{}", sep).unwrap();
+        write!(&mut s, "{sep}").unwrap();
         s.push(' ');
         s.push_str(content);
     }
